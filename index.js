@@ -1,8 +1,15 @@
 const fs = require('fs');
+const path = require('path');
+
+// Folder name to save files
+const projectName = 'colorsStats';
 
 const directories = [];
 const files = [];
 let colors = {};
+
+const currentPath = process.env.INIT_CWD || process.env.OLDPWD;
+const currentDir = path.relative(process.cwd(), currentPath);
 
 const {initialPath, ignoreDirs = [], ignoreFiles = []} = require('./config.js')
 
@@ -173,7 +180,7 @@ const fillColors = ({fullPath}) => {
 
           color = getFullHex(color);
 
-          const RGB = getRGB(color);
+          const RGB = HEXtoRGB(color);
           const lightness = Object.keys(RGB)
             .reduce((prev, item) => {
               prev += RGB[item];
@@ -206,8 +213,9 @@ const fillColors = ({fullPath}) => {
 //------------------------------
 
 const fillIndex = () => {
-  fs.readFile(`${initialPath}/findColors/index-src.html`, 'utf-8', (err, data) => {
+  fs.readFile(`${currentPath}/${projectName}/index-src.html`, 'utf-8', (err, data) => {
     if(err) {
+      console.log(`Error: check if this folder name is ${projectName}`);
       throw err;
     }
 
@@ -235,12 +243,13 @@ const fillIndex = () => {
 </ul>`;
     const newMarkup = data.replace('<!-- content -->', colorsList);
 
-    fs.writeFile(`${initialPath}/findColors/index.html`, newMarkup, (err, data) => {
+    fs.writeFile(`${currentPath}/${projectName}/index.html`, newMarkup, (err, data) => {
       if(err) {
-        console.log(err);
+        console.log(`Error: check if this folder name is ${projectName}`);
+        throw err;
       }
 
-      console.log('Index was written');
+      console.log(`Index was written and can be opened: YOUR_PATH/${projectName}/index.html`);
     });
   });
 };
@@ -248,12 +257,13 @@ const fillIndex = () => {
 //------------------------------
 
 const writeFilesList = () => {
-  fs.writeFile(`${initialPath}/findColors/files.json`, JSON.stringify(files,null,'\t'), (err, data) => {
+  fs.writeFile(`${currentPath}/${projectName}/files.json`, JSON.stringify(files,null,'\t'), (err, data) => {
     if(err) {
-      console.log(err);
+      console.log(`Error: check if this folder name is ${projectName}`);
+      throw err;
     }
 
-    console.log('files was written');
+    console.log('filesList was written to files.json');
   })
 }
 
@@ -276,7 +286,7 @@ const getFullHex = (hex) => {
 
 //------------------------------
 
-const getRGB = (hex) => {
+const HEXtoRGB = (hex) => {
   const R = hex.slice(0,2);
   const G = hex.slice(2,4);
   const B = hex.slice(4,6);
@@ -367,13 +377,6 @@ const RGBtoHSL = function ({r,g,b}) {
     l
   };
 };
-
-const textColor = getRGB('807E7E');
-const hsl = RGBtoHSL(textColor);
-console.log(textColor);
-console.log();
-const hslStr = `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
-console.log(hslStr);
 
 //------------------------------
 
