@@ -4,14 +4,25 @@ const path = require('path');
 // Folder name to save files
 const projectName = 'colorsStats';
 
-const directories = [];
+let directories = [];
 const files = [];
 let colors = {};
 
 const currentPath = process.env.INIT_CWD || process.env.OLDPWD;
 const currentDir = path.relative(process.cwd(), currentPath);
 
-const {initialPath, ignoreDirs = [], ignoreFiles = []} = require('./config.js')
+let {
+  initialPath,
+  setDirsToParse,
+  notOlderThan,
+  ignoreDirs = [],
+  ignoreFiles = []
+} = require('./config.js')
+
+if(setDirsToParse) {
+  directories = setDirsToParse;
+  initialPath = directories.pop();
+}
 
 //------------------------------
 
@@ -43,7 +54,7 @@ const readDir = (path) => {
           resolveReadDir();
         })
         .catch(err => {
-          console.log('Error in processing of filtered: ', err);
+          console.log('\nError in processing of filtered: ', err);
         })
     })
   });
@@ -57,12 +68,14 @@ const readDir = (path) => {
         readDir(nextDir);
       }
       else {
+        console.log('\nDONE');
+        console.log('------------------------------');
         fillIndex();
         writeFilesList();
       }
     })
     .catch(err => {
-      console.log('Error while reading dir', err);
+      console.log('\nError while reading dir', err);
     });
 };
 
@@ -95,10 +108,8 @@ const handleFiltered = ({filtered, path}) => {
               });
 
             if(!isIgnoredFile) {
-              // Ignore olfd files
-              const fileDateMS = parseInt(stats.mtimeMs);
-              const dateOfOldFilesMS = new Date(2018, 0, 1).getTime();
-              const isNew = dateOfOldFilesMS <= fileDateMS;
+              // Ignore old files if notOlderThan is set
+              const isNew = checkIsNew(stats.mtimeMs);
 
               if(isNew) {
                 fillColors({
@@ -113,7 +124,7 @@ const handleFiltered = ({filtered, path}) => {
           }
         })
         .catch(err => {
-          console.log('Error in reading file stats: ', err);
+          console.log('\nError in reading file stats: ', err);
         })
     })
   })
@@ -156,7 +167,10 @@ const getFileContent = (fullPath) => {
 //------------------------------
 
 const fillColors = ({fullPath}) => {
-  if(fullPath.indexOf('.css') < 0) {
+  const extensions = ['.css', '.js'];
+  const needToRead = extensions.includes(path.extname(fullPath));
+
+  if(!needToRead) {
     return;
   }
 
@@ -165,7 +179,7 @@ const fillColors = ({fullPath}) => {
   getFileContent(fullPath)
     .then(result => {
 
-      const grepColors = result.match(/ #[0-9a-f]{3,6}/igm);
+      const grepColors = result.match(/[ ']#[0-9a-f]{3,6}/igm);
 
       if(!grepColors) {
         return;
@@ -173,10 +187,7 @@ const fillColors = ({fullPath}) => {
 
       const grepColorsUpper = grepColors
         .map(item => {
-          let color = item
-            .trim()
-            .toUpperCase()
-            .replace(/[;,)]/,'');
+          let color = normalizeName(item);
 
           color = getFullHex(color);
 
@@ -205,10 +216,34 @@ const fillColors = ({fullPath}) => {
         });
     })
     .catch(err => {
-      console.log('Error in reading file: ', err);
+      console.log('\nError in reading file: ', err);
       console.log('Path:', fullPath);
     })
 };
+
+//------------------------------
+
+const checkIsNew = (mtimeMs) => {
+  if(!notOlderThan || !notOlderThan.year) {
+    return true;
+  }
+
+  const dateParts = [
+    notOlderThan.year
+  ];
+  if(notOlderThan.month) {
+    dateParts.push(notOlderThan.month - 1);
+
+    if(notOlderThan.day) {
+      dateParts.push(notOlderThan.day);
+    }
+  }
+
+  const fileDateMS = parseInt(mtimeMs);
+  const dateOfOldFilesMS = new Date(...dateParts).getTime();
+
+  return dateOfOldFilesMS <= fileDateMS;
+}
 
 //------------------------------
 
@@ -226,6 +261,8 @@ const fillIndex = () => {
     const colorsItems = colorsCodes
       .map(color => {
         const {name, fullPath, isDark, counter, hsl} = colors[color];
+        const fileUrl = fullPath
+          .replace(initialPath, '');
         let result = '';
         const classIsDark = isDark ? 'color--dark' : '';
         const classIsPopular = counter > 5 ? 'color--most-popular' : counter > 3 ? 'color--popular' : '';
@@ -250,6 +287,7 @@ const fillIndex = () => {
       }
 
       console.log(`Index was written and can be opened: YOUR_PATH/${projectName}/index.html`);
+      console.log('------------------------------');
     });
   });
 };
@@ -263,17 +301,27 @@ const writeFilesList = () => {
       throw err;
     }
 
-    console.log('filesList was written to files.json');
+    console.log('Files list was written to files.json');
   })
 }
 
 //------------------------------
 
-const getFullHex = (hex) => {
-  let trimed = hex.slice(1);
+const normalizeName = (name) => {
+  const result = name
+    .trim()
+    .toUpperCase()
+    .replace('#', '')
+    .replace(/[;,)\']/, '');
 
-  if(trimed.length === 3) {
-    trimed = trimed
+  return result;
+}
+
+//------------------------------
+
+const getFullHex = (hex) => {
+  if(hex.length === 3) {
+    hex = hex
       .split('')
       .map(char => {
         return `${char}${char}`
@@ -281,7 +329,7 @@ const getFullHex = (hex) => {
       .join('');
   }
 
-  return trimed;
+  return hex;
 }
 
 //------------------------------
@@ -307,6 +355,13 @@ const sortColors = (a, b) => {
   const a_sl_sum = a_hsl.s + a_hsl.l;
   const b_sl_sum = b_hsl.s + b_hsl.l;
 
+  // L
+  if (a_hsl.l < b_hsl.l) {
+    return -1;
+  }
+  if (a_hsl.l > b_hsl.l) {
+    return 1;
+  }
 
   // H
   if (a_hsl.h < b_hsl.h) {
@@ -321,14 +376,6 @@ const sortColors = (a, b) => {
     return -1;
   }
   if (a_sl_sum > b_sl_sum) {
-    return 1;
-  }
-
-  // L
-  if (a_hsl.l < b_hsl.l) {
-    return -1;
-  }
-  if (a_hsl.l > b_hsl.l) {
     return 1;
   }
 

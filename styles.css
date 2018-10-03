@@ -14,7 +14,8 @@ BODY {
 
 .color {
   position: relative;
-  padding: 8px;
+  padding: 8px 8px 16px;
+  overflow: hidden;
   flex-basis: 10%;
   display: flex;
   justify-content: center;
@@ -43,6 +44,26 @@ BODY {
   right: 4px;
   top: 4px;
   font-size: 12px;
+}
+
+.color__url {
+  position: absolute;
+  bottom: -100%;
+  left: 4px;
+  right: 4px;
+  overflow: hidden;
+  font-size: 12px;
+  display: flex;
+  justify-content: flex-end;
+  transition: bottom .5s;
+}
+
+.color:hover .color__url {
+  bottom: 0;
+}
+
+.color__url-text {
+  white-space: nowrap;
 }
 
 .colors__separator {
