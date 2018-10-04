@@ -35,7 +35,7 @@ const readDir = (path) => {
 
       const filtered = data
         .filter((item) => {
-          if(item.startsWith('.') < 0 || item.indexOf('.gif') > -1) {
+          if(item.startsWith('.') < 0) {
             return false
           }
 
@@ -167,7 +167,7 @@ const getFileContent = (fullPath) => {
 //------------------------------
 
 const fillColors = ({fullPath}) => {
-  const extensions = ['.css', '.js'];
+  const extensions = ['.css', '.scss', '.js'];
   const needToRead = extensions.includes(path.extname(fullPath));
 
   if(!needToRead) {
