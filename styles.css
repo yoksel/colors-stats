@@ -14,7 +14,7 @@ BODY {
 
 .color {
   position: relative;
-  padding: 8px 8px 16px;
+  padding: 8px;
   overflow: hidden;
   flex-basis: 10%;
   display: flex;
