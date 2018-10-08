@@ -10,6 +10,11 @@ let colors = {};
 
 const currentPath = process.env.INIT_CWD || process.env.OLDPWD;
 const currentDir = path.relative(process.cwd(), currentPath);
+let filesPath = currentDir;
+
+if(currentDir.indexOf(projectName) < 0) {
+  filesPath += `/${projectName}`;
+}
 
 let {
   initialPath,
@@ -248,7 +253,7 @@ const checkIsNew = (mtimeMs) => {
 //------------------------------
 
 const fillIndex = () => {
-  fs.readFile(`${currentPath}/${projectName}/index-src.html`, 'utf-8', (err, data) => {
+  fs.readFile(`${filesPath}/index-src.html`, 'utf-8', (err, data) => {
     if(err) {
       console.log(`Error: check if this folder name is ${projectName}`);
       throw err;
@@ -280,7 +285,7 @@ const fillIndex = () => {
 </ul>`;
     const newMarkup = data.replace('<!-- content -->', colorsList);
 
-    fs.writeFile(`${currentPath}/${projectName}/index.html`, newMarkup, (err, data) => {
+    fs.writeFile(`${filesPath}/index.html`, newMarkup, (err, data) => {
       if(err) {
         console.log(`Error: check if this folder name is ${projectName}`);
         throw err;
@@ -295,7 +300,7 @@ const fillIndex = () => {
 //------------------------------
 
 const writeFilesList = () => {
-  fs.writeFile(`${currentPath}/${projectName}/files.json`, JSON.stringify(files,null,'\t'), (err, data) => {
+  fs.writeFile(`${filesPath}/files.json`, JSON.stringify(files,null,'\t'), (err, data) => {
     if(err) {
       console.log(`Error: check if this folder name is ${projectName}`);
       throw err;
