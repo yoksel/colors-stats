@@ -20,6 +20,7 @@ let {
   initialPath,
   setDirsToParse,
   notOlderThan,
+  popularityThreshold,
   ignoreDirs = [],
   ignoreFiles = []
 } = require('./config.js')
@@ -36,6 +37,7 @@ const readDir = (path) => {
     fs.readdir(path, (err, data) => {
       if (err) {
         rejectReadDir(err);
+        return;
       }
 
       const filtered = data
@@ -259,11 +261,24 @@ const fillIndex = () => {
       throw err;
     }
 
-    const colorsCodes = Object.keys(colors);
+    const colorsKeys = Object.keys(colors);
 
-    colorsCodes.sort(sortColors);
+    colorsKeys.sort(sortColors);
+    let colorsItems = colorsKeys;
 
-    const colorsItems = colorsCodes
+    if(popularityThreshold && popularityThreshold > 0) {
+      const initialLength = colorsItems.length;
+
+      colorsItems = colorsItems
+        .filter(color => {
+          const {counter} = colors[color];
+          return counter >= popularityThreshold;
+        });
+
+      console.log(`Filter by popularity: ${initialLength} > ${colorsItems.length}`);
+    }
+
+    colorsItems = colorsItems
       .map(color => {
         const {name, fullPath, isDark, counter, hsl} = colors[color];
         const fileUrl = fullPath

@@ -17,6 +17,10 @@ module.exports = {
     day: '1' //1-32
   },
 
+  // Filter colors by popularity
+  // Set 0 to disable
+  popularityThreshold: 3,
+
   // Directories to ignore
   ignoreDirs: [
     '/old-version'
