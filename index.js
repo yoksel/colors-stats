@@ -8,15 +8,8 @@ let directories = [];
 const files = [];
 let colors = {};
 
-const currentPath = process.env.INIT_CWD || process.env.OLDPWD;
-const currentDir = path.relative(process.cwd(), currentPath);
-let filesPath = currentDir;
-
-if(currentDir.indexOf(projectName) < 0) {
-  filesPath += `/${projectName}`;
-}
-
 let {
+  root,
   initialPath,
   setDirsToParse,
   notOlderThan,
@@ -24,6 +17,14 @@ let {
   ignoreDirs = [],
   ignoreFiles = []
 } = require('./config.js')
+
+const currentPath = process.env.INIT_CWD || process.env.OLDPWD;
+const currentDir = currentPath ? path.relative(process.cwd(), currentPath) : root;
+let filesPath = currentDir;
+
+if(currentDir.indexOf(projectName) < 0) {
+  filesPath += `/${projectName}`;
+}
 
 if(setDirsToParse) {
   directories = setDirsToParse;
