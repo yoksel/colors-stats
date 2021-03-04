@@ -1,4 +1,5 @@
 const fs = require('fs');
+const { checkIsColor } = require('./colors-helpers');
 
 const sortColors = (colorA, colorB) => {
   const a_hsl = Object.assign({}, colorA.hsla);
@@ -6,14 +7,6 @@ const sortColors = (colorA, colorB) => {
 
   const a_sl_sum = a_hsl.s + a_hsl.l;
   const b_sl_sum = b_hsl.s + b_hsl.l;
-
-  // L
-  if (a_hsl.l < b_hsl.l) {
-    return -1;
-  }
-  if (a_hsl.l > b_hsl.l) {
-    return 1;
-  }
 
   // H
   if (a_hsl.h < b_hsl.h) {
@@ -28,6 +21,14 @@ const sortColors = (colorA, colorB) => {
     return -1;
   }
   if (a_sl_sum > b_sl_sum) {
+    return 1;
+  }
+
+  // L
+  if (a_hsl.l < b_hsl.l) {
+    return -1;
+  }
+  if (a_hsl.l > b_hsl.l) {
     return 1;
   }
 
@@ -58,42 +59,82 @@ const sortColors = (colorA, colorB) => {
 
 //------------------------------
 
-const getMarkup = ({colors, popularityThreshold}) => {
-  let colorsValues = Object.values(colors);
-    colorsValues.sort(sortColors);
+const getColorsMarkup = ({colorsValues, popularityThreshold}) => {
+  colorsValues.sort(sortColors);
 
-    if (popularityThreshold && popularityThreshold > 0) {
-      const initialLength = colorsValues.length;
+  if (popularityThreshold && popularityThreshold > 0) {
+    const initialLength = colorsValues.length;
 
-      colorsValues = colorsValues
-        .filter(color => {
-          const { counter } = colors[color];
-          return counter >= popularityThreshold;
-        });
-
-      console.log(`Filter by popularity: ${initialLength} > ${colorsValues.length}`);
-    }
-
-    const colorsItems = colorsValues
-      .map((color) => {
-        const { initialColor, fullPaths, isDark, counter } = color;
-        let result = '';
-        const classIsDark = isDark ? 'color--dark' : '';
-        const classIsPopular = counter > 5 ? 'color--most-popular' : counter > 3 ? 'color--popular' : '';
-
-        result += `<li class="color ${classIsDark} ${classIsPopular}" style="background-color: ${initialColor}">
-          <span class="color__name">${initialColor}</span>
-          <span class="color__counter">${counter} in ${fullPaths.size}</span>
-        </li>`;
-
-        return result;
+    colorsValues = colorsValues
+      .filter(({ counter }) => {
+        return counter
+          ? counter >= popularityThreshold
+          : true;
       });
 
-    const colorsList = `<ul class="colors">
+    console.log(`Filter by popularity: ${initialLength} > ${colorsValues.length}`);
+  }
+
+  const colorsItems = colorsValues
+    .map((color) => {
+      const { initialColor, name, fullPaths, isDark, counter } = color;
+      let result = '';
+      const classIsDark = isDark ? 'color--dark' : '';
+      const classIsPopular = counter > 5 ? 'color--most-popular' : counter > 3 ? 'color--popular' : '';
+
+      const counterValue = counter ? ` ${counter} in ${fullPaths.size}` : '';
+
+      result += `<li class="color ${classIsDark} ${classIsPopular}" style="background-color: ${initialColor}">
+        <span class="color__name"> ${name ? `${name}<br>` : ''} ${initialColor}</span>
+        <span class="color__counter">${counterValue}</span>
+      </li>`;
+
+      return result;
+    });
+
+  const colorsList = `<ul class="colors">
   ${colorsItems.join('')}
 </ul>`;
 
   return colorsList;
+}
+
+//------------------------------
+
+const getVariablesMarkup = ({variables, popularityThreshold}) => {
+  let markup = '';
+
+  const filesMarkup = Object.values(variables).map(fileData => {
+    markup += `<h3>${fileData.fullPath}</h3>`;
+    markup += getColorsMarkup({
+      colorsValues: fileData.colors,
+      popularityThreshold
+    });
+    markup += getVariablesValuesMarkup({
+      variablesValues: fileData.values,
+      popularityThreshold
+    });
+  });
+
+  return markup;
+}
+//------------------------------
+
+const getVariablesValuesMarkup = ({variablesValues, popularityThreshold}) => {
+  // variablesValues.sort(sortColors);
+
+  const variablesItems = variablesValues.map((variable) => {
+    const { name, value } = variable;
+    return `<li class="variables" data-style="background-variables: ${value}">
+        <span class="variables__name">${name}: ${value}</i></span>
+    </li>`;
+  });
+
+  const variablesList = `<ul class="variables">
+    ${variablesItems.join('')}
+  </ul>`;
+
+  return variablesList;
 }
 
 //------------------------------
@@ -126,10 +167,26 @@ const getFilesPromises = ({filesPath, projectName}) => {
 
 //------------------------------
 
-module.exports.fillIndex = async ({filesPath, projectName, colors,popularityThreshold}) => {
+const getMarkup = ({colors, variables, popularityThreshold}) => {
+  const colorsValues = Object.values(colors);
+
+  if (colorsValues.length > 0)
+    return getColorsMarkup({colorsValues, popularityThreshold});
+
+  const variablesValues = Object.values(variables);
+
+  if (variablesValues.length > 0)
+    return getVariablesMarkup({variables, popularityThreshold});
+
+  return '';
+}
+
+//------------------------------
+
+module.exports.fillIndex = async ({filesPath, projectName, colors, variables,popularityThreshold}) => {
   const [template, styles] = await Promise.all(getFilesPromises({filesPath, projectName}));
 
-  const markup = getMarkup({colors,popularityThreshold})
+  const markup = getMarkup({colors, variables, popularityThreshold})
   const newMarkup = template
     .replace('<!-- styles -->', `<style>${styles}</style>`)
     .replace('<!-- content -->', markup);

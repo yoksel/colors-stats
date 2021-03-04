@@ -1,11 +1,13 @@
 const fs = require('fs');
 const path = require('path');
-const { getStat, getFileContent, checkIsNew, writeFilesList, isNeedToReadFile } = require('./helpers/files-handlers');
-const { checkIfHslaValid, checkIfAlphaLow, prettifyColor} = require('./helpers/colors-helpers');
+const {
+    getFileContent,
+    getReadDirPromise
+} = require('./helpers/files-handlers');
+const { getColorsFromContent, checkIfHslaValid, checkIfAlphaLow, prettifyColor, checkColor, checkIsDark} = require('./helpers/colors-helpers');
 const { fillIndex } = require('./helpers/fill-index');
 const { getColorData } = require('./helpers/get-color-data');
 const { colorToHsla } = require('./helpers/color-to-hsl');
-
 
 // Folder name to save files
 const projectName = 'colors-stats';
@@ -20,7 +22,7 @@ let {
   initialPath,
   setDirsToParse,
   searchFor,
-  extensions,
+  fileExtensions,
   notOlderThan,
   popularityThreshold,
   ignoreDirs = [],
@@ -43,133 +45,48 @@ if (setDirsToParse) {
 
 //------------------------------
 
-const getReadDirPromise = (path) => {
-  return new Promise((resolve, reject) => {
-    fs.readdir(path, (err, data) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      const filtered = data
-        .filter((item) => {
-          if (item.startsWith('.')) {
-            return false
-          }
-
-          return true;
-        });
-
-      if (filtered.length === 0) {
-        resolve();
-      }
-
-      handleFiltered({
-        filtered,
-        path
-      })
-        .then(() => {
-          resolve();
-        })
-        .catch(err => {
-          console.log('\nError in processing of filtered: ', err);
-        })
-    })
-  });
+const pushToDirectories = fullPath => {
+    directories.push(fullPath);
 };
 
 //------------------------------
 
-const readDir = async (path) => {
-  if (!path) {
-    console.log('\nPath is undefined');
-    return;
-  }
-
-  const readDirPromise = getReadDirPromise(path);
-
-  readDirPromise
-    .then(async () => {
-      // Call next
-      if (directories.length > 0) {
-        const nextDir = directories.pop();
-        readDir(nextDir);
-      }
-      else {
-        await handleFoundedFiles();
-        fillIndex({filesPath, projectName, colors, popularityThreshold});
-        // writeFilesList({filesPath, files, projectName, colors})
-        console.log('\nDONE');
-        console.log('------------------------------');
-      }
-    })
-    .catch(err => {
-      console.log('\nError while reading dir', err);
+const readDir = async ({initialPath, filesToParse, fileHandler = fillStats}) => new Promise(async (resolve, reject) => {
+    const readDirPromise = getReadDirPromise({
+        dirPath: initialPath,
+        filesToParse,
+        fileHandler,
+        ignoreDirs,
+        ignoreFiles,
+        notOlderThan,
+        pushToDirectories
     });
-};
+
+    await readDirPromise;
+
+    if (directories.length > 0) {
+        const nextDir = directories.pop();
+        await readDir({initialPath: nextDir, filesToParse, fileHandler});
+
+        resolve();
+    }
+    else {
+        resolve();
+    }
+});
 
 //------------------------------
 
-const handleFiltered = ({ filtered, path }) => {
-  return new Promise((resolve) => {
+const handleFiles = async () => {
+    console.log('Files:', files.length);
+    const filesToParse = files.slice();
 
-    filtered.forEach((item, index) => {
-      const fullPath = `${path}/${item}`;
-
-      getStat(fullPath)
-        .then((stats) => {
-          if (stats.isDirectory()) {
-            // Handle stats
-            const isIgnoredDir = ignoreDirs
-              .some((item) => {
-                return fullPath.indexOf(item) > -1;
-              });
-
-            if (!isIgnoredDir) {
-              directories.push(fullPath);
-            }
-          }
-          else if (stats.isFile()) {
-            const isIgnoredFile = ignoreFiles
-              .some((item) => {
-                return fullPath.indexOf(item) > -1;
-              });
-
-            if (!isIgnoredFile) {
-              // Ignore old files if notOlderThan is set
-              const isNew = checkIsNew({
-                mtimeMs: stats.mtimeMs,
-                notOlderThan
-              });
-
-              if (isNew) {
-                sourceFiles.push(fullPath);
-              }
-            }
-          }
-
-          if (index === filtered.length - 1) {
-            resolve();
-          }
-        })
-        .catch((err) => {
-          console.log('\nError in reading file stats: ', err);
-        })
-    })
-  })
-}
-
-//------------------------------
-
-const handleFoundedFiles = async () => {
-    console.log('Files:', sourceFiles.length);
-    const filesToParse = sourceFiles.slice();
-
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const handleChunk = async () => {
         const filesChunk = filesToParse.splice(0, 10);
         const promises = filesChunk.map(fullPath => getHandleFilePromise(fullPath))
-        await Promise.all(promises)
+
+        await Promise.all(promises.filter(Boolean));
 
         if (filesToParse.length > 0) {
             // console.log(filesToParse.length);
@@ -180,27 +97,8 @@ const handleFoundedFiles = async () => {
         }
       }
 
-      await handleChunk();
+      handleChunk();
     })
-}
-
-//------------------------------
-
-const getColorsFromContent = (fileContent) => {
-  const grepColorsHEX = fileContent.match(/#[0-9a-f]{3,8}/igm);
-  const grepColorsRGB = fileContent.match(/rgb(a)?\([^)]+\)/igm);
-  const grepColorsHSL = fileContent.match(/hsl(a)?\([^)]+\)/igm);
-
-  let grepColors = [];
-
-  if (grepColorsHEX)
-    grepColors = grepColors.concat(grepColorsHEX);
-  if (grepColorsRGB)
-    grepColors = grepColors.concat(grepColorsRGB);
-  if (grepColorsHSL)
-    grepColors = grepColors.concat(grepColorsHSL);
-
-  return grepColors;
 }
 
 //------------------------------
@@ -214,17 +112,13 @@ const fillColors = ({fullPath, fileContent}) => {
 
   colorsFromFile.forEach((initialColor) => {
     const {format, alphaUnits} = getColorData(initialColor);
-    const hsla = colorToHsla({color: initialColor, format});
+    const hsla = colorToHsla({color: initialColor, format, alphaUnits});
     const hslaAsKey = Object.values(hsla).join('-');
 
     if(!checkIfHslaValid(hsla))
       return;
 
-    if(alphaUnits === '%')
-      hsla.a /= 100;
-
-    const isAlphaLow = checkIfAlphaLow({hsla, alphaUnits})
-    const isDark = hsla.l < 50 && !isAlphaLow;
+    const isDark = checkIsDark({hsla, alphaUnits})
 
     if (!colors[hslaAsKey]) {
       colors[hslaAsKey] = {
@@ -244,33 +138,64 @@ const fillColors = ({fullPath, fileContent}) => {
 
 //------------------------------
 
+const prettifyValue = (value) => {
+  return value
+    .replace(';', '')
+    .replace(/\/\/.*/, '')
+    .trim();
+}
+
+//------------------------------
+
 const fillVariables = ({fullPath, fileContent}) => {
-  let variablesFromFile = fileContent.match(/^\s+(@|--).*/igm);
+  let variablesFromFile = fileContent.match(/^\s?(@|\$|--).*/igm);
 
   if (!variablesFromFile) {
     return;
   }
 
   variablesFromFile.forEach((initialVariable) => {
-    if(!initialVariable.includes(':') || initialVariable.includes('@media'))
+    if(!initialVariable.includes(':') || initialVariable.includes('@media')) {
       return;
+    }
 
     const varParts = initialVariable
       .split(':')
       .map(item => item.trim());
 
-    const [name, value] = varParts;
+    let [name, value] = varParts;
+    value =  prettifyValue(value);
+    const pathParts = fullPath.split('App/')
+    const keyFromPath = pathParts[1];
 
-    if (!variables[name]) {
-      variables[name] = {
-        initialVariable: `${name}: ${value}`,
-        fullPaths: new Set([fullPath]),
-        counter: 1
+    if (!variables[keyFromPath]) {
+      variables[keyFromPath] = {
+        fullPath,
+        colors: [],
+        values: []
       };
     }
+
+    const {hsla, alphaUnits, isColor} = checkColor(value);
+
+    if (isColor) {
+      const isDark = checkIsDark({hsla, alphaUnits})
+
+      variables[keyFromPath].colors.push({
+          initialVariable: `${name}: ${value}`,
+          initialColor: value,
+          name,
+          value,
+          hsla,
+          isDark
+      });
+    }
     else {
-      variables[name].counter++;
-      variables[name].fullPaths.add(fullPath);
+      variables[keyFromPath].values.push({
+        initialVariable: `${name}: ${value}`,
+        name,
+        value
+      });
     }
   });
 }
@@ -278,22 +203,63 @@ const fillVariables = ({fullPath, fileContent}) => {
 //------------------------------
 
 const getHandleFilePromise = async (fullPath) => {
-    if (!isNeedToReadFile({fullPath, extensions}))
-      return;
+    return new Promise((resolve, reject) => {
+      try {
+        getFileContent(fullPath)
+          .then(fileContent => {
+            if (searchFor === 'colors')
+              fillColors({fullPath, fileContent});
+            else if(searchFor === 'variables')
+              fillVariables({fullPath, fileContent});
 
-    try {
-      const fileContent = await getFileContent(fullPath);
-      fillColors({fullPath, fileContent});
-    }
-    catch (err) {
-      console.log('\nError in reading file: ', err);
-      console.log('Path:', fullPath);
-    }
+            resolve();
+          })
+      }
+      catch (err) {
+        console.log('\nError in reading file: ', err);
+        console.log('Path:', fullPath);
 
-    return;
+        reject();
+      }
+    })
 };
 
 //------------------------------
 
-readDir(initialPath);
+const saveFileUrl = async ({fullPath}) => {
+    const needToRead = fileExtensions.includes(path.extname(fullPath));
 
+    if (!needToRead) {
+        return;
+    }
+
+    files.push(fullPath);
+};
+
+
+//------------------------------
+
+(async () => {
+    // Находим все файлы
+    if(initialPath) {
+        console.log(`\n\n* Start parsing from path: ${initialPath} *\n`);
+        await readDir({initialPath, fileHandler: saveFileUrl});
+    }
+    else {
+        console.log(`\n\nNothing to parse.\nAdd to config folders or files\n\n`);
+        return;
+    }
+
+    // Собираем данные
+    await handleFiles();
+
+    console.log('\n................................................');
+    console.log('* Start writing data to files *');
+
+    // Записываем данные в файлы
+    await fillIndex({filesPath, projectName, colors, variables, popularityThreshold});
+
+    console.log('\n------------------------------------------------');
+
+    console.log('\n');
+})();

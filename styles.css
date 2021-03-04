@@ -7,7 +7,7 @@ BODY {
   margin: 0 auto;
   padding: 0;
   list-style-type: none;
-  display: grid;
+  display: inline-grid;
   grid-template-columns: repeat(auto-fit, minmax(15%, 1fr));
   grid-auto-rows: 1fr;
   gap: .2em;
@@ -16,6 +16,7 @@ BODY {
 .color {
   position: relative;
   z-index: 0;
+  min-width: 50px;
   padding: 12px;
   padding-top: 24px;
   overflow: hidden;

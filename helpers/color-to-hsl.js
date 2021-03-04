@@ -1,17 +1,25 @@
-module.exports.colorToHsla = ({ color, format }) => {
+module.exports.colorToHsla = ({ color, format, alphaUnits }) => {
   color = color.toLowerCase();
 
+  let hsla;
+
   if (format === 'keyword') {
-    return color;
+    hsla = color;
   }
-  if (format.includes('hsl')) {
-    return hslaFromString(color);
+  else if (format.includes('hsl')) {
+    hsla = hslaFromString(color);
   }
-  if (format.includes('rgb')) {
-    return RGBToHSL(rgbaFromString(color));
+  else if (format.includes('rgb')) {
+    hsla = RGBToHSL(rgbaFromString(color));
+  }
+  else {
+    hsla = RGBToHSL(hexToRGB(color))
   }
 
-  return RGBToHSL(hexToRGB(color));
+  if(alphaUnits === '%' && hsla.a)
+    hsla.a /= 100;
+
+  return hsla;
 };
 
 const hslaFromString = (str) => {

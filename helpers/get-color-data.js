@@ -38,7 +38,7 @@ const getColorFormat = (color) => {
     return 'keyword';
   }
 
-  return 'Unknown color format';
+  return null;
 };
 
 const getAlphaUnits = ({ color, format }) => {
