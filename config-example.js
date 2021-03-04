@@ -9,6 +9,13 @@ module.exports = {
     'another-fancy-component',
   ],
 
+  // If exist, files fill be filtered by extensions
+  fileExtensions: ['.css','.less','.scss'],
+
+  // Search all colors or all style variables
+  // colors | variables
+  searchFor: 'variables',
+
   // If exist, files older than this date
   // will not be processed
   notOlderThan: {
