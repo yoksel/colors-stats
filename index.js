@@ -1,6 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const { getStat, getFileContent, checkIsNew, writeFilesList, isNeedToReadFile } = require('./helpers/files-handlers');
+const { checkIfHslaValid, checkIfAlphaLow, prettifyColor} = require('./helpers/colors-helpers');
+const { fillIndex } = require('./helpers/fill-index');
+const { getColorData } = require('./helpers/get-color-data');
+const { colorToHsla } = require('./helpers/color-to-hsl');
 
 
 // Folder name to save files
@@ -9,20 +13,19 @@ const projectName = 'colors-stats';
 let directories = [];
 const files = [];
 let colors = {};
+let variables = {};
 
 let {
   root,
   initialPath,
   setDirsToParse,
+  searchFor,
   extensions,
   notOlderThan,
   popularityThreshold,
   ignoreDirs = [],
   ignoreFiles = []
 } = require('./config.js');
-const { fillIndex } = require('./helpers/fill-index');
-const { getColorData } = require('./helpers/get-color-data');
-const { colorToHsla } = require('./helpers/color-to-hsl');
 
 const currentPath = process.env.INIT_CWD || process.env.OLDPWD;
 const currentDir = currentPath ? path.relative(process.cwd(), currentPath) : root;
@@ -159,19 +162,27 @@ const handleFiltered = ({ filtered, path }) => {
 //------------------------------
 
 const handleFoundedFiles = async () => {
-  const promises = [];
+    console.log('Files:', sourceFiles.length);
+    const filesToParse = sourceFiles.slice();
 
-  sourceFiles.forEach((fullPath) => {
-    if (!isNeedToReadFile({fullPath, extensions}))
-      return;
+    return new Promise(async (resolve, reject) => {
+      const handleChunk = async () => {
+        const filesChunk = filesToParse.splice(0, 10);
+        const promises = filesChunk.map(fullPath => getHandleFilePromise(fullPath))
+        await Promise.all(promises)
 
-    files.push(fullPath);
+        if (filesToParse.length > 0) {
+            // console.log(filesToParse.length);
+            handleChunk();
+        }
+        else {
+            resolve();
+        }
+      }
 
-    promises.push(getHandleFilePromise(fullPath));
-  })
-
-  await Promise.all(promises);
-};
+      await handleChunk();
+    })
+}
 
 //------------------------------
 
@@ -190,27 +201,6 @@ const getColorsFromContent = (fileContent) => {
     grepColors = grepColors.concat(grepColorsHSL);
 
   return grepColors;
-}
-
-//------------------------------
-
-const checkIfAlphaLow = ({hsla, alphaUnits}) => {
-  let alpha = hsla.a;
-
-  if(alpha === undefined)
-    return false;
-
-  return alpha < .5;
-}
-
-//------------------------------
-
-const checkIfHslaValid = (hsla) => {
-  const colorValues = Object.values(hsla);
-
-  return colorValues.every(value => value === undefined
-    ? true
-    : !isNaN(value));
 }
 
 //------------------------------
@@ -254,26 +244,53 @@ const fillColors = ({fullPath, fileContent}) => {
 
 //------------------------------
 
-const prettifyColor = ({initialColor, format}) => {
-  if(format === 'hex')
-    initialColor = initialColor.toUpperCase();
+const fillVariables = ({fullPath, fileContent}) => {
+  let variablesFromFile = fileContent.match(/^\s+(@|--).*/igm);
 
-  return initialColor
-    .replace(/ /g, '')
-    .replace(/(0\.)/g, '.')
+  if (!variablesFromFile) {
+    return;
+  }
+
+  variablesFromFile.forEach((initialVariable) => {
+    if(!initialVariable.includes(':') || initialVariable.includes('@media'))
+      return;
+
+    const varParts = initialVariable
+      .split(':')
+      .map(item => item.trim());
+
+    const [name, value] = varParts;
+
+    if (!variables[name]) {
+      variables[name] = {
+        initialVariable: `${name}: ${value}`,
+        fullPaths: new Set([fullPath]),
+        counter: 1
+      };
+    }
+    else {
+      variables[name].counter++;
+      variables[name].fullPaths.add(fullPath);
+    }
+  });
 }
 
 //------------------------------
 
 const getHandleFilePromise = async (fullPath) => {
-  try {
-    const fileContent = await getFileContent(fullPath);
-    fillColors({fullPath, fileContent});
-  }
-  catch (err) {
+    if (!isNeedToReadFile({fullPath, extensions}))
+      return;
+
+    try {
+      const fileContent = await getFileContent(fullPath);
+      fillColors({fullPath, fileContent});
+    }
+    catch (err) {
       console.log('\nError in reading file: ', err);
       console.log('Path:', fullPath);
-  }
+    }
+
+    return;
 };
 
 //------------------------------
