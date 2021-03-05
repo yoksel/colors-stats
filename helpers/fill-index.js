@@ -84,12 +84,13 @@ const getColorsMarkup = ({colorsValues, popularityThreshold, isJSX}) => {
 
       const counterValue = counter ? ` ${counter} in ${fullPaths.size}` : '';
       const counterMarkup = counterValue ? `<span class="color__counter">${counterValue}</span>` : '';
+      const classHasCounter = counterValue ? 'color--has-counter' : '';
       let styleValue = `"background-color: ${initialColor}"`;
 
       if(isJSX)
         styleValue = `{{'backgroundColor': '${initialColor}'}}`;
 
-      result += `<li class="color ${classIsDark} ${classIsPopular}" style=${styleValue}>
+      result += `<li class="color ${classIsDark} ${classIsPopular} ${classHasCounter}" style=${styleValue}>
   <span class="color__name"> ${name ? `${name}<br/>` : ''} ${value}</span>${counterMarkup}
 </li>`;
 
@@ -101,6 +102,28 @@ const getColorsMarkup = ({colorsValues, popularityThreshold, isJSX}) => {
 </ul>`;
 
   return colorsList;
+}
+
+//------------------------------
+
+const getVariablesByPrefixes = (variables) => {
+  return variables.reduce((prev, item) => {
+    if(!item.name.includes('_')) {
+      prev['noPrefix'].push(item);
+      return prev;
+    }
+
+    const prefix = item.name.slice(1).split('_')[0];
+
+    if(!prev[prefix])
+      prev[prefix] = [];
+
+    prev[prefix].push(item);
+
+    return prev;
+  }, {
+    noPrefix: []
+  });
 }
 
 //------------------------------
@@ -119,10 +142,14 @@ const getVariablesMarkup = ({variables, popularityThreshold, isJSX}) => {
 
     markup += '\n\n';
 
-    markup += getVariablesValuesMarkup({
-      variablesValues: fileData.values,
-      popularityThreshold,
-      isJSX
+    const valuesByPrefixes = getVariablesByPrefixes(fileData.values);
+
+    Object.values(valuesByPrefixes).forEach(item => {
+        markup += getVariablesValuesMarkup({
+        variablesValues: item,
+        popularityThreshold,
+        isJSX
+      });
     });
   });
 
@@ -131,8 +158,6 @@ const getVariablesMarkup = ({variables, popularityThreshold, isJSX}) => {
 //------------------------------
 
 const getVariablesValuesMarkup = ({variablesValues, popularityThreshold}) => {
-  // variablesValues.sort(sortColors);
-
   const variablesItems = variablesValues.map((variable) => {
     const { name, value } = variable;
     const isColorVarValue = value.includes('@c_');

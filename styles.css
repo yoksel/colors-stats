@@ -18,7 +18,6 @@ BODY {
   z-index: 0;
   min-width: 50px;
   padding: 12px;
-  padding-top: 24px;
   overflow: hidden;
   display: flex;
   justify-content: flex-start;
@@ -31,6 +30,16 @@ BODY {
   background-size: 2em 2em;
   color: #000;
   font-size: 12px;
+}
+
+/* Remove margin from storybook styles */
+
+.colors .color {
+  margin: 0;
+}
+
+.color--has-counter {
+  padding-top: 24px;
 }
 
 .color::after {
@@ -92,6 +101,10 @@ BODY {
 .colors__separator {
   flex-basis: 100%;
   height: 10px;
+}
+
+.variables + .variables {
+  margin-top: 1rem;
 }
 
 .variable--color {
