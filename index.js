@@ -22,6 +22,7 @@ let {
   initialPath,
   setDirsToParse,
   searchFor,
+  isJSX,
   fileExtensions,
   notOlderThan,
   popularityThreshold,
@@ -257,7 +258,7 @@ const saveFileUrl = async ({fullPath}) => {
     console.log('* Start writing data to files *');
 
     // Записываем данные в файлы
-    await fillIndex({filesPath, projectName, colors, variables, popularityThreshold});
+    await fillIndex({filesPath, projectName, colors, variables, popularityThreshold, isJSX});
 
     console.log('\n------------------------------------------------');
 

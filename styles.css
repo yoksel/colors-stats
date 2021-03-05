@@ -93,3 +93,7 @@ BODY {
   flex-basis: 100%;
   height: 10px;
 }
+
+.variable--color {
+  background: #EEE;
+}

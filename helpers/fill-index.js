@@ -59,7 +59,7 @@ const sortColors = (colorA, colorB) => {
 
 //------------------------------
 
-const getColorsMarkup = ({colorsValues, popularityThreshold}) => {
+const getColorsMarkup = ({colorsValues, popularityThreshold, isJSX}) => {
   colorsValues.sort(sortColors);
 
   if (popularityThreshold && popularityThreshold > 0) {
@@ -83,17 +83,21 @@ const getColorsMarkup = ({colorsValues, popularityThreshold}) => {
       const classIsPopular = counter > 5 ? 'color--most-popular' : counter > 3 ? 'color--popular' : '';
 
       const counterValue = counter ? ` ${counter} in ${fullPaths.size}` : '';
+      const counterMarkup = counterValue ? `<span class="color__counter">${counterValue}</span>` : '';
+      let styleValue = `"background-color: ${initialColor}"`;
 
-      result += `<li class="color ${classIsDark} ${classIsPopular}" style="background-color: ${initialColor}">
-        <span class="color__name"> ${name ? `${name}<br>` : ''} ${initialColor}</span>
-        <span class="color__counter">${counterValue}</span>
-      </li>`;
+      if(isJSX)
+        styleValue = `{{'backgroundColor': '${initialColor}'}}`;
+
+      result += `<li class="color ${classIsDark} ${classIsPopular}" style=${styleValue}>
+  <span class="color__name"> ${name ? `${name}<br/>` : ''} ${initialColor}</span>${counterMarkup}
+</li>`;
 
       return result;
     });
 
   const colorsList = `<ul class="colors">
-  ${colorsItems.join('')}
+  ${colorsItems.join('\n')}
 </ul>`;
 
   return colorsList;
@@ -101,18 +105,24 @@ const getColorsMarkup = ({colorsValues, popularityThreshold}) => {
 
 //------------------------------
 
-const getVariablesMarkup = ({variables, popularityThreshold}) => {
+const getVariablesMarkup = ({variables, popularityThreshold, isJSX}) => {
   let markup = '';
 
   const filesMarkup = Object.values(variables).map(fileData => {
     markup += `<h3>${fileData.fullPath}</h3>`;
+
     markup += getColorsMarkup({
       colorsValues: fileData.colors,
-      popularityThreshold
+      popularityThreshold,
+      isJSX
     });
+
+    markup += '\n\n';
+
     markup += getVariablesValuesMarkup({
       variablesValues: fileData.values,
-      popularityThreshold
+      popularityThreshold,
+      isJSX
     });
   });
 
@@ -125,14 +135,16 @@ const getVariablesValuesMarkup = ({variablesValues, popularityThreshold}) => {
 
   const variablesItems = variablesValues.map((variable) => {
     const { name, value } = variable;
-    return `<li class="variables" data-style="background-variables: ${value}">
-        <span class="variables__name">${name}: ${value}</i></span>
-    </li>`;
+    const isColorVarValue = value.includes('@c_');
+    const colorVarClass = isColorVarValue ? 'variable--color' : '';
+    return `<li class="variable ${colorVarClass}">
+  ${name}: ${value}
+</li>`;
   });
 
   const variablesList = `<ul class="variables">
-    ${variablesItems.join('')}
-  </ul>`;
+  ${variablesItems.join('\n')}
+</ul>`;
 
   return variablesList;
 }
@@ -167,7 +179,7 @@ const getFilesPromises = ({filesPath, projectName}) => {
 
 //------------------------------
 
-const getMarkup = ({colors, variables, popularityThreshold}) => {
+const getMarkup = ({colors, variables, popularityThreshold, isJSX}) => {
   const colorsValues = Object.values(colors);
 
   if (colorsValues.length > 0)
@@ -176,17 +188,17 @@ const getMarkup = ({colors, variables, popularityThreshold}) => {
   const variablesValues = Object.values(variables);
 
   if (variablesValues.length > 0)
-    return getVariablesMarkup({variables, popularityThreshold});
+    return getVariablesMarkup({variables, popularityThreshold, isJSX});
 
   return '';
 }
 
 //------------------------------
 
-module.exports.fillIndex = async ({filesPath, projectName, colors, variables,popularityThreshold}) => {
+module.exports.fillIndex = async ({filesPath, projectName, colors, variables,popularityThreshold, isJSX}) => {
   const [template, styles] = await Promise.all(getFilesPromises({filesPath, projectName}));
 
-  const markup = getMarkup({colors, variables, popularityThreshold})
+  const markup = getMarkup({colors, variables, popularityThreshold, isJSX})
   const newMarkup = template
     .replace('<!-- styles -->', `<style>${styles}</style>`)
     .replace('<!-- content -->', markup);
