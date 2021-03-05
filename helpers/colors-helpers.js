@@ -3,6 +3,20 @@ const { getColorData } = require("./get-color-data");
 
 //------------------------------
 
+module.exports.hslToString = ({ hsla, alphaUnits = '', format = 'hsl' }) => {
+  const { h, s, l, a } = hsla;
+  const colorsList = [`${h}`, `${s}%`, `${l}%`];
+
+  if (a) {
+    format = 'hsla';
+    colorsList.push(`${a}${alphaUnits}`);
+  }
+
+  return `${format}(${colorsList.join(', ')})`;
+};
+
+//------------------------------
+
 module.exports.getColorsFromContent = (fileContent) => {
   const grepColorsHEX = fileContent.match(/#[0-9a-f]{3,8}/igm);
   const grepColorsRGB = fileContent.match(/rgb(a)?\([^)]+\)/igm);

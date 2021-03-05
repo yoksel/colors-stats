@@ -4,7 +4,7 @@ const {
     getFileContent,
     getReadDirPromise
 } = require('./helpers/files-handlers');
-const { getColorsFromContent, checkIfHslaValid, checkIfAlphaLow, prettifyColor, checkColor, checkIsDark} = require('./helpers/colors-helpers');
+const { getColorsFromContent, checkIfHslaValid, hslToString, prettifyColor, checkColor, checkIsDark} = require('./helpers/colors-helpers');
 const { fillIndex } = require('./helpers/fill-index');
 const { getColorData } = require('./helpers/get-color-data');
 const { colorToHsla } = require('./helpers/color-to-hsl');
@@ -155,6 +155,8 @@ const fillVariables = ({fullPath, fileContent}) => {
     return;
   }
 
+  const colorVarsByName = {};
+
   variablesFromFile.forEach((initialVariable) => {
     if(!initialVariable.includes(':') || initialVariable.includes('@media')) {
       return;
@@ -165,7 +167,7 @@ const fillVariables = ({fullPath, fileContent}) => {
       .map(item => item.trim());
 
     let [name, value] = varParts;
-    value =  prettifyValue(value);
+    value = prettifyValue(value);
     const pathParts = fullPath.split('App/')
     const keyFromPath = pathParts[1];
 
@@ -180,23 +182,54 @@ const fillVariables = ({fullPath, fileContent}) => {
     const {hsla, alphaUnits, isColor} = checkColor(value);
 
     if (isColor) {
-      const isDark = checkIsDark({hsla, alphaUnits})
-
-      variables[keyFromPath].colors.push({
+      const isDark = checkIsDark({hsla, alphaUnits});
+      const color = {
           initialVariable: `${name}: ${value}`,
           initialColor: value,
           name,
           value,
           hsla,
           isDark
-      });
+      };
+
+      variables[keyFromPath].colors.push(color);
+
+      colorVarsByName[name] = color;
     }
     else {
-      variables[keyFromPath].values.push({
-        initialVariable: `${name}: ${value}`,
-        name,
-        value
-      });
+      const matchFadeFunc = value.match(/fade\((@[\S]+),([^)]+)\)/);
+      let color = colorVarsByName[value];
+
+      if(matchFadeFunc) {
+        colorVar = matchFadeFunc[1];
+        percents = parseFloat(matchFadeFunc[2]);
+        color = Object.assign({}, colorVarsByName[colorVar]);
+
+        if (!color.hsla.a) {
+          color.hsla.a = 1;
+        }
+
+        color.hsla.a = color.hsla.a - percents / 100;
+        color.value = hslToString({hsla: color.hsla});
+      }
+
+      if (color) {
+        variables[keyFromPath].colors.push({
+          initialVariable: `${name}: ${value}`,
+          initialColor: color.value,
+          name,
+          value,
+          hsla: color.hsla,
+          isDark: color.isDark
+        });
+      }
+      else {
+        variables[keyFromPath].values.push({
+          initialVariable: `${name}: ${value}`,
+          name,
+          value
+        });
+      }
     }
   });
 }

@@ -77,7 +77,7 @@ const getColorsMarkup = ({colorsValues, popularityThreshold, isJSX}) => {
 
   const colorsItems = colorsValues
     .map((color) => {
-      const { initialColor, name, fullPaths, isDark, counter } = color;
+      const { initialColor, name, value, fullPaths, isDark, counter } = color;
       let result = '';
       const classIsDark = isDark ? 'color--dark' : '';
       const classIsPopular = counter > 5 ? 'color--most-popular' : counter > 3 ? 'color--popular' : '';
@@ -90,7 +90,7 @@ const getColorsMarkup = ({colorsValues, popularityThreshold, isJSX}) => {
         styleValue = `{{'backgroundColor': '${initialColor}'}}`;
 
       result += `<li class="color ${classIsDark} ${classIsPopular}" style=${styleValue}>
-  <span class="color__name"> ${name ? `${name}<br/>` : ''} ${initialColor}</span>${counterMarkup}
+  <span class="color__name"> ${name ? `${name}<br/>` : ''} ${value}</span>${counterMarkup}
 </li>`;
 
       return result;
